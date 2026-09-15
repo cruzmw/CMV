@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de CMV para Drinks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap' );
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .tab-btn.active {
+            background-color: #fff;
+            color: #5b21b6; /* purple-700 */
+            box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- CABEÇALHO E NAVEGAÇÃO POR ABAS -->
+    <header class="gradient-bg shadow-md">
+        <div class="container mx-auto px-4 py-6 max-w-6xl">
+            <div class="text-center mb-6">
+                <h1 class="text-4xl font-bold text-white">🍸 Sistema de CMV para Drinks</h1>
+                <p class="text-white/80 text-lg">Uma ferramenta completa para gestão do seu bar</p>
+            </div>
+            <nav class="bg-white/20 rounded-xl p-2 flex justify-center space-x-2">
+                <button onclick="changeTab('analise')" class="tab-btn active w-1/3 py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300">📊 Análise & CMV</button>
+                <button onclick="changeTab('fichas')" class="tab-btn w-1/3 py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300">🍹 Fichas Técnicas</button>
+                <button onclick="changeTab('insumos')" class="tab-btn w-1/3 py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300">📦 Insumos</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-10 max-w-6xl">
+        <!-- SEÇÃO 1: ANÁLISE & CMV -->
+        <div id="analise" class="tab-content fade-in">
+            <!-- Seletor de Drink -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Selecione o Drink para Análise</h2>
+                <select id="analise-drink-select" class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-lg focus:ring-2 focus:ring-purple-500"></select>
+            </div>
+
+            <!-- Painel de Análise (inicialmente oculto) -->
+            <div id="analysis-panel" class="hidden space-y-8">
+                <div class="bg-white rounded-xl card-shadow p-8">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-6">Análise Financeira</h2>
+                    <div class="grid md:grid-cols-3 gap-8 text-center">
+                        <div>
+                            <div class="text-sm text-gray-600">Custo Final (CMV)</div>
+                            <div id="cmv-final" class="text-4xl font-bold text-red-600">R$ 0,00</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Preço de Venda</div>
+                            <div id="preco-venda" class="text-4xl font-bold text-green-600">R$ 0,00</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">Margem de Lucro</div>
+                            <div id="margem-lucro" class="text-4xl font-bold text-purple-600">0%</div>
+                        </div>
+                    </div>
+                    <div class="mt-8 pt-6 border-t">
+                        <label for="markup-slider" class="block text-center font-medium text-gray-700 mb-2">Ajustar Markup: <span id="markup-value" class="font-bold">4.0x (300%)</span></label>
+                        <input id="markup-slider" type="range" min="1.5" max="8" value="4" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl card-shadow p-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold text-gray-800">Ficha Técnica Detalhada</h2>
+                        <button id="export-btn" class="bg-purple-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-purple-700 transition-opacity">Exportar para Excel</button>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3">Composição</h3>
+                            <ul id="composicao-lista" class="space-y-3"></ul>
+                            <div class="border-t mt-4 pt-4 flex justify-between font-bold">
+                                <span>Custo Total:</span><span id="composicao-custo-total">R$ 0,00</span>
+                            </div>
+                            <div class="mt-2 flex justify-between font-semibold text-sm text-gray-600">
+                                <span>Volume Total:</span><span id="composicao-volume-total">0 ml</span>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3">Modo de Preparo</h3>
+                            <p id="modo-preparo" class="text-gray-600 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 2: CADASTRO DE FICHAS TÉCNICAS -->
+        <div id="fichas" class="tab-content hidden fade-in">
+            <div class="bg-white rounded-xl card-shadow p-8">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-6 border-b pb-3">1. Detalhes do Drink</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="drink-nome" class="block text-sm font-medium text-gray-700 mb-1">Nome do Drink</label>
+                                <input type="text" id="drink-nome" placeholder="Ex: Negroni Clássico" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500">
+                            </div>
+                            <div>
+                                <label for="drink-preparo" class="block text-sm font-medium text-gray-700 mb-1">Modo de Preparo</label>
+                                <textarea id="drink-preparo" rows="4" placeholder="1. Adicione gelo ao copo..." class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500"></textarea>
+                            </div>
+                        </div>
+                        <h2 class="text-2xl font-semibold text-gray-800 mt-8 mb-4 border-b pb-3">2. Composição da Receita</h2>
+                        <div id="form-ingrediente" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end p-4 bg-gray-50 rounded-lg">
+                            <div class="sm:col-span-2">
+                                <label for="ficha-insumo-select" class="block text-sm font-medium text-gray-700 mb-1">Insumo</label>
+                                <select id="ficha-insumo-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500"></select>
+                            </div>
+                            <div>
+                                <label for="insumo-qtd" class="block text-sm font-medium text-gray-700 mb-1">Qtd (ml/g)</label>
+                                <input type="number" id="insumo-qtd" placeholder="30" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500">
+                            </div>
+                            <div class="sm:col-span-3">
+                                <button type="button" onclick="adicionarIngrediente()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Adicionar Ingrediente</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Resumo do Drink</h2>
+                        <div id="resumo-drink" class="space-y-3">
+                            <p id="resumo-vazio" class="text-center text-gray-500 py-8">Adicione ingredientes para ver o resumo.</p>
+                            <ul id="lista-ingredientes" class="divide-y divide-gray-200"></ul>
+                        </div>
+                        <div class="mt-6 border-t-2 border-dashed pt-4 space-y-4">
+                            <div class="flex justify-between items-center text-lg">
+                                <span class="text-gray-600">Volume Total:</span>
+                                <span id="ficha-volume-total" class="font-bold text-gray-800">0 ml</span>
+                            </div>
+                            <div class="flex justify-between items-center text-xl">
+                                <span class="font-semibold text-gray-700">Custo Total (CMV):</span>
+                                <span id="ficha-custo-total" class="font-bold text-purple-600">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t">
+                    <button onclick="salvarFichaTecnica()" class="w-full bg-purple-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-purple-700 text-lg">Salvar Ficha Técnica</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 3: CADASTRO DE INSUMOS -->
+        <div id="insumos" class="tab-content hidden fade-in">
+            <div class="bg-white rounded-xl card-shadow p-8 mb-10">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Adicionar Novo Insumo</h2>
+                <form id="form-insumo" class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="insumo-nome" class="block text-sm font-medium text-gray-700 mb-1">Nome do Insumo</label>
+                        <input type="text" id="insumo-nome" placeholder="Ex: Gin Tanqueray" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label for="insumo-categoria" class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <input type="text" id="insumo-categoria" placeholder="Ex: Destilado, Suco" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500">
+                    </div>
+                    <div class="relative">
+                        <label for="insumo-volume" class="block text-sm font-medium text-gray-700 mb-1">Volume da Unidade</label>
+                        <input type="number" id="insumo-volume" placeholder="1000" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 pl-3 pr-12">
+                        <span class="absolute inset-y-0 right-0 top-6 flex items-center pr-3 pointer-events-none text-gray-500 text-sm">ml / g</span>
+                    </div>
+                    <div class="relative">
+                        <label for="insumo-preco" class="block text-sm font-medium text-gray-700 mb-1">Preço de Custo</glabel>
+                        <input type="number" step="0.01" id="insumo-preco" placeholder="75.50" required class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 pl-10">
+                        <span class="absolute inset-y-0 left-0 top-6 flex items-center pl-3 pointer-events-none text-gray-500">R$</span>
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" class="w-full bg-purple-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-purple-700 text-lg">+ Adicionar Insumo</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white rounded-xl card-shadow p-8">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Insumos Cadastrados</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Insumo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Custo por ml/g</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalhes</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-insumos" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // ===================================================================================
+    // ESTADO GLOBAL E LÓGICA DE DADOS
+    // ===================================================================================
+    let insumos = JSON.parse(localStorage.getItem('insumos')) || [];
+    let fichasTecnicas = JSON.parse(localStorage.getItem('fichasTecnicas')) || [];
+    let fichaTecnicaAtual = { ingredientes: [], custoTotal: 0, volumeTotal: 0 };
+    let fichaSelecionadaParaAnalise = null;
+
+    function saveData() {
+        localStorage.setItem('insumos', JSON.stringify(insumos));
+        localStorage.setItem('fichasTecnicas', JSON.stringify(fichasTecnicas));
+    }
+
+    // ===================================================================================
+    // LÓGICA DE NAVEGAÇÃO POR ABAS (TABS)
+    // ===================================================================================
+    function changeTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+        document.getElementById(tabName).classList.remove('hidden');
+
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`button[onclick="changeTab('${tabName}')"]`).classList.add('active');
+        
+        // Atualiza os dados das outras abas que podem depender de mudanças
+        if (tabName === 'fichas') popularInsumosSelect();
+        if (tabName === 'analise') popularAnaliseDrinkSelect();
+    }
+
+    // ===================================================================================
+    // SEÇÃO DE INSUMOS
+    // ===================================================================================
+    const formInsumo = document.getElementById('form-insumo');
+    const listaInsumosUI = document.getElementById('lista-insumos');
+
+    function renderizarInsumos() {
+        listaInsumosUI.innerHTML = '';
+        if (insumos.length === 0) {
+            listaInsumosUI.innerHTML = `<tr><td colspan="4" class="px-6 py-10 text-center text-gray-500">Nenhum insumo cadastrado.</td></tr>`;
+        } else {
+            insumos.forEach((insumo, index) => {
+                const custoPorMedida = (insumo.preco / insumo.volume).toFixed(4);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4"><div class="text-sm font-semibold text-gray-900">${insumo.nome}</div><div class="text-sm text-gray-500">${insumo.categoria}</div></td>
+                    <td class="px-6 py-4"><div class="text-sm text-green-600 font-medium">R$ ${custoPorMedida}</div></td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${insumo.volume}ml/g por R$ ${insumo.preco.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-right"><button onclick="removerInsumo(${index})" class="text-red-600 hover:text-red-900 text-sm font-medium">Remover</button></td>
+                `;
+                listaInsumosUI.appendChild(tr);
+            });
+        }
+    }
+
+    function adicionarInsumo(e) {
+        e.preventDefault();
+        insumos.push({
+            nome: document.getElementById('insumo-nome').value,
+            categoria: document.getElementById('insumo-categoria').value,
+            volume: parseFloat(document.getElementById('insumo-volume').value),
+            preco: parseFloat(document.getElementById('insumo-preco').value)
+        });
+        saveData();
+        renderizarInsumos();
+        formInsumo.reset();
+    }
+
+    function removerInsumo(index) {
+        if (confirm(`Tem certeza que deseja remover o insumo "${insumos[index].nome}"?`)) {
+            insumos.splice(index, 1);
+            saveData();
+            renderizarInsumos();
+        }
+    }
+    formInsumo.addEventListener('submit', adicionarInsumo);
+
+    // ===================================================================================
+    // SEÇÃO DE FICHAS TÉCNICAS
+    // ===================================================================================
+    const fichaInsumoSelect = document.getElementById('ficha-insumo-select');
+    const listaIngredientesUI = document.getElementById('lista-ingredientes');
+
+    function popularInsumosSelect() {
+        fichaInsumoSelect.innerHTML = '<option value="">Selecione um insumo...</option>';
+        insumos.forEach((insumo, index) => {
+            fichaInsumoSelect.innerHTML += `<option value="${index}">${insumo.nome}</option>`;
+        });
+    }
+
+    function adicionarIngrediente() {
+        const index = fichaInsumoSelect.value;
+        const qtd = parseFloat(document.getElementById('insumo-qtd').value);
+        if (index === "" || !qtd || qtd <= 0) {
+            alert('Selecione um insumo e uma quantidade válida.');
+            return;
+        }
+        const insumo = insumos[index];
+        const custo = (insumo.preco / insumo.volume) * qtd;
+        fichaTecnicaAtual.ingredientes.push({ nome: insumo.nome, quantidade: qtd, custo: custo });
+        atualizarResumoFicha();
+        document.getElementById('insumo-qtd').value = '';
+    }
+    
+    function removerIngrediente(index) {
+        fichaTecnicaAtual.ingredientes.splice(index, 1);
+        atualizarResumoFicha();
+    }
+
+    function atualizarResumoFicha() {
+        listaIngredientesUI.innerHTML = '';
+        let custoTotal = 0, volumeTotal = 0;
+        fichaTecnicaAtual.ingredientes.forEach((ing, index) => {
+            custoTotal += ing.custo;
+            volumeTotal += ing.quantidade;
+            listaIngredientesUI.innerHTML += `
+                <li class="py-3 flex justify-between items-center">
+                    <div><p class="text-sm font-semibold">${ing.nome}</p><p class="text-sm text-gray-500">${ing.quantidade} ml/g</p></div>
+                    <div class="text-right"><p class="text-sm font-medium text-green-600">R$ ${ing.custo.toFixed(2)}</p><button onclick="removerIngrediente(${index})" class="text-xs text-red-500">remover</button></div>
+                </li>`;
+        });
+        document.getElementById('resumo-vazio').style.display = fichaTecnicaAtual.ingredientes.length > 0 ? 'none' : 'block';
+        document.getElementById('ficha-custo-total').textContent = `R$ ${custoTotal.toFixed(2)}`;
+        document.getElementById('ficha-volume-total').textContent = `${volumeTotal} ml`;
+        fichaTecnicaAtual.custoTotal = custoTotal;
+        fichaTecnicaAtual.volumeTotal = volumeTotal;
+    }
+
+    function salvarFichaTecnica() {
+        const nome = document.getElementById('drink-nome').value;
+        if (!nome || fichaTecnicaAtual.ingredientes.length === 0) {
+            alert('O drink precisa de um nome e pelo menos um ingrediente.');
+            return;
+        }
+        fichasTecnicas.push({
+            nome: nome,
+            preparo: document.getElementById('drink-preparo').value,
+            ...fichaTecnicaAtual
+        });
+        saveData();
+        alert(`Ficha técnica para "${nome}" salva com sucesso!`);
+        resetarFormularioFicha();
+    }
+    
+    function resetarFormularioFicha() {
+        document.getElementById('drink-nome').value = '';
+        document.getElementById('drink-preparo').value = '';
+        fichaTecnicaAtual = { ingredientes: [], custoTotal: 0, volumeTotal: 0 };
+        atualizarResumoFicha();
+    }
+
+    // ===================================================================================
+    // SEÇÃO DE ANÁLISE
+    // ===================================================================================
+    const analiseDrinkSelect = document.getElementById('analise-drink-select');
+    const markupSlider = document.getElementById('markup-slider');
+
+    function popularAnaliseDrinkSelect() {
+        analiseDrinkSelect.innerHTML = '<option value="" disabled selected>-- Selecione um drink --</option>';
+        fichasTecnicas.forEach((ficha, index) => {
+            analiseDrinkSelect.innerHTML += `<option value="${index}">${ficha.nome}</option>`;
+        });
+        document.getElementById('analysis-panel').classList.add('hidden');
+    }
+
+    function exibirAnalise(index) {
+        if (index === "") return;
+        fichaSelecionadaParaAnalise = fichasTecnicas[index];
+        const { custoTotal, volumeTotal, ingredientes, preparo } = fichaSelecionadaParaAnalise;
+        
+        document.getElementById('composicao-lista').innerHTML = ingredientes.map(ing => 
+            `<li class="flex justify-between text-sm"><span>${ing.nome} (${ing.quantidade}ml/g)</span><span class="font-medium">R$ ${ing.custo.toFixed(2)}</span></li>`
+        ).join('');
+        
+        document.getElementById('composicao-custo-total').textContent = `R$ ${custoTotal.toFixed(2)}`;
+        document.getElementById('composicao-volume-total').textContent = `${volumeTotal} ml`;
+        document.getElementById('modo-preparo').textContent = preparo || 'Nenhum modo de preparo cadastrado.';
+        
+        atualizarCalculosAnalise();
+        document.getElementById('analysis-panel').classList.remove('hidden');
+    }
+
+    function atualizarCalculosAnalise() {
+        if (!fichaSelecionadaParaAnalise) return;
+        const custo = fichaSelecionadaParaAnalise.custoTotal;
+        const markup = parseFloat(markupSlider.value);
+        const precoVenda = custo * markup;
+        const margemLucro = precoVenda > 0 ? ((precoVenda - custo) / precoVenda) * 100 : 0;
+
+        document.getElementById('cmv-final').textContent = `R$ ${custo.toFixed(2)}`;
+        document.getElementById('preco-venda').textContent = `R$ ${precoVenda.toFixed(2)}`;
+        document.getElementById('margem-lucro').textContent = `${margemLucro.toFixed(0)}%`;
+        document.getElementById('markup-value').textContent = `${markup.toFixed(1)}x (${((markup - 1) * 100).toFixed(0)}%)`;
+    }
+
+    function exportarParaExcel() {
+        if (!fichaSelecionadaParaAnalise) return;
+        const { nome, custoTotal, volumeTotal, ingredientes, preparo } = fichaSelecionadaParaAnalise;
+        const markup = parseFloat(markupSlider.value);
+        const precoVenda = custoTotal * markup;
+        const margemLucro = (precoVenda - custoTotal) / precoVenda;
+
+        const data = [
+            ["Nome do Drink", nome], ["Custo Total (CMV)", { t: 'n', v: custoTotal, z: '"R$"#,##0.00' }], [],
+            ["Composição", "Qtd", "Custo"],
+            ...ingredientes.map(ing => [ing.nome, `${ing.quantidade} ml/g`, { t: 'n', v: ing.custo, z: '"R$"#,##0.00' }]), [],
+            ["Modo de Preparo", preparo], [],
+            ["Análise Financeira"],
+            ["Markup Aplicado", {t: 'n', v: (markup-1), z: '0%'}],
+            ["Preço de Venda Sugerido", { t: 'n', v: precoVenda, z: '"R$"#,##0.00' }],
+            ["Margem de Lucro Bruta", {t: 'n', v: margemLucro, z: '0%'}]
+        ];
+        
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        ws['!cols'] = [{ wch: 25 }, { wch: 50 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ficha Técnica");
+        XLSX.writeFile(wb, `Ficha_Tecnica_${nome.replace(/ /g, "_")}.xlsx`);
+    }
+    analiseDrinkSelect.addEventListener('change', (e) => exibirAnalise(e.target.value));
+    markupSlider.addEventListener('input', atualizarCalculosAnalise);
+    document.getElementById('export-btn').addEventListener('click', exportarParaExcel);
+
+    // ===================================================================================
+    // INICIALIZAÇÃO
+    // ===================================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        renderizarInsumos();
+        popularInsumosSelect();
+        popularAnaliseDrinkSelect();
+        changeTab('analise'); // Define a aba inicial
+    });
+    </script>
+</body>
+</html>
